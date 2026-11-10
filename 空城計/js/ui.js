@@ -102,6 +102,10 @@
     camHold('#camUp', () => { G.cam.pitch = Math.min(1.35, G.cam.pitch + 0.03); });
     camHold('#camDown', () => { G.cam.pitch = Math.max(0.08, G.cam.pitch - 0.03); });
     $('#camMap').onclick = () => UI.toggleMap();
+    const camFold = (f) => { $('#camCtl').classList.toggle('folded', f); try { localStorage.setItem('kc_cam_fold', f ? '1' : '0'); } catch (e) { } };
+    let fold0 = null; try { fold0 = localStorage.getItem('kc_cam_fold'); } catch (e) { }
+    camFold(fold0 === null ? G.isTouch : fold0 === '1');
+    $('#camToggle').onclick = () => camFold(!$('#camCtl').classList.contains('folded'));
     $('#hMusic').onclick = () => { AUDIO.init(); AUDIO.music = !AUDIO.music; AUDIO.startBGM(); AUDIO.applyMusic(); $('#hMusic').textContent = AUDIO.music ? '🎵' : '🔇'; };
     $('#dialog').onclick = () => UI.dialogNext();
     $('#minimap').onclick = () => UI.toggleMap();

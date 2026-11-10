@@ -32,7 +32,14 @@
     try { G.R = new M3D.Renderer(canvas, { maxDPR: isTouch ? 1.5 : 2, preserve: G.renderMode }); }
     catch (e) { document.getElementById('loading').innerHTML = '<p>😢 這個瀏覽器不支援 3D（WebGL），請改用 Chrome 或 Safari 最新版。</p>'; return; }
     const R = G.R;
-    const resize = () => R.resize(window.innerWidth, window.innerHeight);
+    // 手機瀏覽器（如 LINE、Safari）底部工具列可能蓋住畫面：用 visualViewport 量出可見高度
+    const resize = () => {
+      const vv = window.visualViewport; const h = vv ? Math.min(window.innerHeight, Math.round(vv.height)) : window.innerHeight;
+      const gap = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+      document.documentElement.style.setProperty('--vb', gap + 'px');
+      R.resize(window.innerWidth, h);
+    };
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
     window.addEventListener('resize', resize); resize();
     // 文字貼圖
     const mk = (t, o) => R.texture(M3D.textCanvas(t, o));

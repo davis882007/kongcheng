@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>空城計：孔明的智謀大冒險</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<!-- 讀取中 -->
+<div id="loading"><div class="ld-fan">🪭</div><p>西城縣建造中……</p></div>
+
+<!-- 標題 -->
+<section id="scr-title" class="screen hidden">
+  <div class="title-wrap">
+    <div class="title-sub">三國演義・第九十五回</div>
+    <h1 class="title-main">空城計</h1>
+    <div class="title-tag">孔明的智謀大冒險 ‧ 3D RPG</div>
+    <div class="title-chars">
+      <img src="assets/characters/sima_yi.png" alt="司馬懿">
+      <img src="assets/characters/zhuge_liang.png" alt="諸葛亮" class="mid">
+      <img src="assets/characters/shu_tong.png" alt="書僮">
+    </div>
+    <div id="titleBtns" class="title-btns"></div>
+  </div>
+  <footer class="title-foot"><span>小益的布拉格廣場</span><span>配合南一國語第九課〈空城計〉</span></footer>
+</section>
+
+<!-- 捏角 -->
+<section id="scr-creator" class="screen hidden">
+  <div class="creator-panel">
+    <h2>🎨 設計你的三國英雄</h2>
+    <div class="name-row">
+      <label for="pname">英雄名稱</label>
+      <input id="pname" maxlength="10" placeholder="輸入名字（最多10字）" autocomplete="off">
+      <button id="rndName" class="btn sm" title="隨機名字">🎲</button>
+    </div>
+    <div id="cTabs" class="tabs"></div>
+    <div id="cArea" class="c-area"></div>
+    <div id="cInfo" class="c-info"></div>
+    <div class="c-btns">
+      <button id="creatorBack" class="btn">◀ 返回</button>
+      <button id="rndLook" class="btn">🎲 隨機造型</button>
+      <button id="creatorOk" class="btn gold">確定 ➜</button>
+    </div>
+  </div>
+  <div class="creator-hint"><button id="spinBtn" class="btn sm">⏸ 停止旋轉</button><span>人物 360° 旋轉中・也可以拖曳畫面轉動</span></div>
+</section>
+
+<!-- 故事書（第一次） -->
+<section id="scr-story" class="screen hidden"><div id="storyBook" class="book"></div></section>
+
+<!-- 遊戲 HUD -->
+<div id="hud" class="hidden">
+  <div class="h-left">
+    <img id="hAvatar" alt="">
+    <div><div id="hName" class="h-name"></div><div class="h-score">⭐ <span id="hScore">0</span> 分　🏯 <span id="hProg">0/8</span></div></div>
+  </div>
+  <div id="nav" class="nav hidden"><div id="navArrow" class="nav-arrow">➤</div><div><div class="nav-label">下一站</div><div id="navName" class="nav-name"></div><div id="navDist" class="nav-dist"></div></div></div>
+  <canvas id="minimap" title="點擊放大地圖"></canvas>
+  <div class="h-btns">
+    <button id="hStory" title="故事書">📜<small>故事</small></button>
+    <button id="hLevels" title="關卡">🗺<small>關卡</small></button>
+    <button id="hBoard" title="排行榜">🏆<small>排行</small></button>
+    <button id="hMusic" title="音樂">🎵</button>
+    <button id="hRestart" title="重新開始遊戲">🔄<small>重來</small></button>
+    <button id="hMenu" title="選單">⚙</button>
+  </div>
+</div>
+<div id="collectHud" class="collect-hud hidden"></div>
+<div id="camCtl" class="cam-ctl hidden" aria-label="地圖視角">
+  <div class="cam-title">視角</div>
+  <button id="camIn" title="放大">＋</button>
+  <button id="camOut" title="縮小">－</button>
+  <button id="camL" title="向左旋轉">⟲</button>
+  <button id="camR" title="向右旋轉">⟳</button>
+  <button id="camUp" title="往上看（俯視）">▲</button>
+  <button id="camDown" title="往下看（平視）">▼</button>
+  <button id="camMap" class="wide" title="放大小地圖">🗺 大地圖</button>
+</div>
+<div class="hud-credit">小益的布拉格廣場・配合南一國語第九課〈空城計〉</div>
+<button id="exitLevel" class="exit-level hidden">✕ 離開關卡</button>
+<div id="controls" class="controls hidden">
+  <button id="btnAct" class="act hidden"></button>
+  <div class="round-btns">
+    <button id="btnNav" class="rb nav-btn">🧭<small>自動前往</small></button>
+    <button id="btnMount" class="rb">🐎<small>騎馬</small></button>
+    <button id="btnJump" class="rb">⤴<small>跳</small></button>
+  </div>
+</div>
+<div id="joy" class="joy hidden"><div id="joyKnob" class="knob"></div></div>
+
+<!-- 對話框 -->
+<div id="dialog" class="dialog hidden">
+  <img id="dlgImg" alt="">
+  <div class="dlg-body"><div id="dlgName" class="dlg-name"></div><div id="dlgText" class="dlg-text"></div><div class="dlg-next">點一下繼續 ▼</div></div>
+</div>
+
+<div id="banner" class="banner hidden"></div>
+<div id="caption" class="caption hidden"></div>
+<button id="skipBtn" class="skip hidden">略過 ⏭</button>
+<div id="modal" class="modal hidden"><div id="modalBox" class="modal-box"></div></div>
+<div id="toast" class="toast"></div>
+<div id="fade" class="fade"></div>
+
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/models.js"></script>
+<script src="js/world.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/minigames.js"></script>
+<script src="assets/embedded.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

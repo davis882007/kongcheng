@@ -15,8 +15,31 @@
 
   /* ---------- 存檔 ---------- */
   const SAVE_KEY = 'kongcheng_save_v1';
-  G.loadSave = function () { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return s && s.name ? s : null; } catch (e) { return null; } };
-  G.writeSave = function () { try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) { } };
+  // 進度存檔：localStorage 為主，cookie 為備份（任一個還在就能接著玩）
+  const readCookie = () => { try { const m = document.cookie.match(/(?:^|; )kc_save=([^;]*)/); return m ? decodeURIComponent(m[1]) : null; } catch (e) { return null; } };
+  const parseSave = (t) => { try { const s = JSON.parse(t || 'null'); return s && s.name && s.look ? s : null; } catch (e) { return null; } };
+  G.loadSave = function () {
+    let a = null, b = parseSave(readCookie());
+    try { a = parseSave(localStorage.getItem(SAVE_KEY)); } catch (e) { }
+    if (a && b) return (b.saved || 0) > (a.saved || 0) ? b : a;
+    return a || b;
+  };
+  G.writeSave = function () {
+    if (!G.save) return; G.save.saved = Date.now(); const t = JSON.stringify(G.save);
+    try { localStorage.setItem(SAVE_KEY, t); } catch (e) { }
+    try { const v = encodeURIComponent(t); if (v.length < 3800) document.cookie = 'kc_save=' + v + '; max-age=' + (60 * 60 * 24 * 365) + '; path=/; SameSite=Lax'; } catch (e) { }
+  };
+  G.clearSave = function () { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } try { document.cookie = 'kc_save=; max-age=0; path=/'; } catch (e) { } G.save = null; };
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
+  // 記住人物位置與騎馬狀態
+  G.savePos = function () {
+    if (!G.save || !G.player || G.state !== 'world') return;
+    const p = G.player.pos; G.save.pos = [+p[0].toFixed(2), +p[1].toFixed(2), +p[2].toFixed(2)]; G.save.yaw = +G.player.yaw.toFixed(3); G.save.mounted = !!G.player.mounted; G.writeSave();
+  };
+  let posTimer = 0;
+  G.tickSave = function (dt) { posTimer += dt; if (posTimer > 4) { posTimer = 0; G.savePos(); } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') G.savePos(); });
+  window.addEventListener('pagehide', () => G.savePos());
   G.newSave = function (name, look) { G.save = { name, look, levels: {}, storyRead: false, finaleDone: false, created: Date.now() }; G.writeSave(); };
   G.totalScore = function () { let s = 0; for (const k in (G.save ? G.save.levels : {})) s += G.save.levels[k].score || 0; return s; };
   G.isDone = (id) => !!(G.save && G.save.levels[id] && G.save.levels[id].done);
@@ -188,9 +211,12 @@
     const ch = MD.character(G.R, look); root.add(ch.root);
     let horse = null; if (look.horse && look.horse !== 'none') { horse = MD.horse(G.R, look.horse); root.add(horse.root); }
     const sh = new M3D.Builder(); sh.cyl(0.7, 0.7, 0.02, 16, '#000000', { p: [0, 0.03, 0] }); const shadow = new M3D.Node(sh.build(G.R)); shadow.alpha = 0.22; shadow.unlit = true; root.add(shadow);
-    const p = G.player ? G.player.pos : WORLD.spawn.slice();
-    G.player = { root, ch, horse, shadow, pos: p, vy: 0, yaw: G.player ? G.player.yaw : -2.4, mounted: false, speed: 0 };
-    G.world.add(root); G.setMounted(false);
+    const sp = G.save.pos; const okPos = !G.player && Array.isArray(sp) && sp.length === 3 && sp.every(v => isFinite(v)) && Math.abs(sp[0]) < 200 && Math.abs(sp[2]) < 200;
+    const p = G.player ? G.player.pos : (okPos ? sp.slice() : WORLD.spawn.slice());
+    const yaw = G.player ? G.player.yaw : (okPos && isFinite(G.save.yaw) ? G.save.yaw : -2.4);
+    const wasMounted = G.player ? G.player.mounted : !!G.save.mounted;
+    G.player = { root, ch, horse, shadow, pos: p, vy: 0, yaw, mounted: false, speed: 0 };
+    G.world.add(root); G.setMounted(wasMounted);
     G.player.pos[1] = WORLD.surfaceAt(p[0], p[2], (p[1] || 0) + 0.5);
   };
   G.setMounted = function (m) {
@@ -252,6 +278,7 @@
   /* ---------- 更新 ---------- */
   function update(dt) {
     G.particles.update(dt);
+    if (G.state === 'world') G.tickSave(dt);
     // 環境動畫
     WORLD.clouds.children.forEach((c, i) => { c.pos[0] += dt * (1 + i % 3); if (c.pos[0] > 230) c.pos[0] = -230; });
     WORLD.water.pos[1] = Math.sin(G.t * 1.2) * 0.04;

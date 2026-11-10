@@ -112,7 +112,7 @@
     if (G.isTouch) document.body.classList.add('touch');
   };
   UI.restartGame = function () {
-    const go = () => { try { localStorage.removeItem('kongcheng_save_v1'); } catch (e) { } G.save = null; G.stopAuto && G.stopAuto(); UI.showCreator(null); };
+    const go = () => { G.clearSave(); G.player && G.world.remove(G.player.root); G.player = null; G.stopAuto && G.stopAuto(); UI.showCreator(null); };
     if (G.save) UI.confirmBox('重新開始會清除目前的名字、造型和闖關進度（排行榜紀錄會保留），確定嗎？', go); else go();
   };
   UI.updateMountBtn = function () { const b = $('#btnMount'); if (!G.player || !G.player.horse) { b.classList.add('hidden'); return; } b.classList.remove('hidden'); b.innerHTML = G.player.mounted ? '🚶<small>下馬</small>' : '🐎<small>騎馬</small>'; };
@@ -121,7 +121,7 @@
   UI.showTitle = function () {
     G.state = 'title'; setHUD(false); screen('#scr-title');
     const s = G.save; const box = $('#titleBtns'); box.innerHTML = '';
-    if (s) { const b = el('button', 'btn big gold', `▶ 繼續冒險<small>${esc(s.name)}・${G.totalScore()} 分</small>`); b.onclick = () => { sfx('click'); s.storyRead ? UI.enterWorld() : UI.showStory(true); }; box.appendChild(b); }
+    if (s) { const nd = D.levels.filter(l => G.isDone(l.id)).length; const b = el('button', 'btn big gold', `▶ 繼續上次的冒險<small>${esc(s.name)}・已過 ${nd}/8 關・${G.totalScore()} 分</small>`); b.onclick = () => { sfx('click'); s.storyRead ? UI.enterWorld() : UI.showStory(true); }; box.appendChild(b); }
     if (!s) { const n0 = el('button', 'btn big gold', '⚔ 開始冒險'); n0.onclick = () => { sfx('click'); UI.showCreator(null); }; box.appendChild(n0); }
     const n = el('button', 'btn big', '🔄 重新開始遊戲'); n.onclick = () => { sfx('click'); UI.restartGame(); }; box.appendChild(n);
     const lb = el('button', 'btn', '🏆 排行榜'); lb.onclick = () => UI.showBoard(); box.appendChild(lb);
@@ -226,7 +226,8 @@
     $('#hName').textContent = G.save.name;
     try { $('#hAvatar').src = G.portrait(G.save.look, 'head', 160); } catch (e) { }
     const n = G.nextLevel();
-    if (n) UI.toast(`🧭 跟著<b>金色足跡</b>前往 <b>第${n}關</b>！<br><small>${G.isTouch ? '左下搖桿或點地面移動、拖曳畫面轉視角，按「自動前往」直接出發' : 'WASD／方向鍵或滑鼠點地面移動、拖曳轉視角、E 互動、R 騎馬、N 自動前往'}</small>`, 5000);
+    if (n && G.resumed !== true && G.save.saved && Object.keys(G.save.levels || {}).length) { G.resumed = true; UI.toast(`💾 已讀取上次進度：完成 ${D.levels.filter(l => G.isDone(l.id)).length}/8 關，從上次的位置繼續！`, 4000); }
+    else if (n) UI.toast(`🧭 跟著<b>金色足跡</b>前往 <b>第${n}關</b>！<br><small>${G.isTouch ? '左下搖桿或點地面移動、拖曳畫面轉視角，按「自動前往」直接出發' : 'WASD／方向鍵或滑鼠點地面移動、拖曳轉視角、E 互動、R 騎馬、N 自動前往'}</small>`, 5000);
     else if (!G.save.finaleDone) UI.runFinale(); else UI.toast('🎉 八關全破！可以到排行榜和證書看看成績。', 4000);
   };
 

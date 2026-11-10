@@ -73,7 +73,7 @@
     };
     G.world = WORLD.build(R, G.tex);
     G.particles = new M3D.Particles(2500);
-    buildNPCs(); buildStations(); buildFinaleProps();
+    buildNPCs(); buildScouts(); buildStations(); buildFinaleProps();
     G.creatorScene = buildCreatorScene();
     setupInput();
     G.portraitR = makePortraitRenderer();
@@ -103,6 +103,28 @@
     return ch;
   }
   G.addNPC = addNPC;
+  // 路上的巡邏小兵（提供情報）
+  const SCOUT_POS = [[50.3, 59.7, 2.01], [45.8, 23, -1.2], [30.2, -1.3, 0.14], [2.6, 4.7, 1.71], [7.9, -13.4, -0.1], [-11.9, 36.4, 3.08], [-54, 9.4, -0.84], [-50.4, -36.4, -2.06], [-4.2, -40.6, -1.05], [-32.6, 3.3, 3.02]];
+  function buildScouts() {
+    G.scouts = []; const list = (window.GAME_DATA.scouts || []);
+    const mb = new M3D.Builder(); mb.box(0.22, 0.62, 0.22, '#ffd23f', { p: [0, 0.42, 0] }); mb.sphere(0.14, '#ffd23f', { p: [0, 0, 0] }, 10, 6);
+    const mMesh = mb.build(G.R);
+    list.forEach((d, i) => {
+      const p = SCOUT_POS[i]; if (!p) return;
+      const ch = addNPC('scout', p[0], p[1], p[2]);
+      const mk = new M3D.Node(mMesh); mk.unlit = true; mk.pos = [p[0], ch.root.pos[1] + 2.9, p[1]]; G.world.add(mk);
+      G.scouts.push({ idx: i, name: d.name, text: d.text, ch, mk, x: p[0], z: p[1], last: -99, read: false });
+    });
+  }
+  G.updateScouts = function (dt) {
+    if (!G.scouts) return; const P = G.player;
+    for (const s of G.scouts) {
+      s.mk.visible = !s.read; if (!s.read) { s.mk.pos[1] = s.ch.root.pos[1] + 2.8 + Math.sin(G.t * 3 + s.idx) * 0.15; s.mk.rot = [0, G.t * 2, 0]; }
+      if (!P || G.state !== 'world') continue;
+      const d = Math.hypot(P.pos[0] - s.x, P.pos[2] - s.z);
+      if (d < 3.4 && Math.abs(P.pos[1] - s.ch.root.pos[1]) < 2 && G.t - s.last > 20) { s.last = G.t; s.read = true; UI.scoutTip(s); }
+    }
+  };
   function buildNPCs() {
     const R = G.R, W = WORLD;
     const st = (id) => W.stations.find(s => s.id === id).pos;
@@ -219,6 +241,17 @@
     G.world.add(root); G.setMounted(wasMounted);
     G.player.pos[1] = WORLD.surfaceAt(p[0], p[2], (p[1] || 0) + 0.5);
   };
+  // 找最近的空地（優先同一高度，例如城樓平台上）
+  G.unstick = function (P) {
+    const r = (P.mounted ? 0.8 : 0.45) + 0.05, x0 = P.pos[0], z0 = P.pos[2], y0 = P.pos[1];
+    const free = (x, z) => { const y = WORLD.surfaceAt(x, z, y0 + 0.4); return !WORLD.blocked(x, z, y, r) && y >= y0 - 0.8 ? y : null; };
+    for (let rad = 0.3; rad <= 6; rad += 0.3) {
+      for (let k = 0; k < 16; k++) { const a = k / 16 * PI * 2; const x = x0 + Math.cos(a) * rad, z = z0 + Math.sin(a) * rad; const y = free(x, z); if (y != null) { P.pos[0] = x; P.pos[2] = z; P.pos[1] = y; P.vy = 0; return true; } }
+    }
+    // 真的找不到：回到坡道下方
+    if (WORLD.rampBottom) { P.pos[0] = WORLD.rampBottom[0]; P.pos[2] = WORLD.rampBottom[2]; P.pos[1] = WORLD.surfaceAt(P.pos[0], P.pos[2], 50); P.vy = 0; }
+    return false;
+  };
   G.setMounted = function (m) {
     const P = G.player; if (!P) return; if (!P.horse) m = false;
     P.mounted = m; P.ch.riding = m;
@@ -279,6 +312,7 @@
   function update(dt) {
     G.particles.update(dt);
     if (G.state === 'world') G.tickSave(dt);
+    G.updateScouts(dt);
     // 環境動畫
     WORLD.clouds.children.forEach((c, i) => { c.pos[0] += dt * (1 + i % 3); if (c.pos[0] > 230) c.pos[0] = -230; });
     WORLD.water.pos[1] = Math.sin(G.t * 1.2) * 0.04;
@@ -384,7 +418,10 @@
       const r = P.mounted ? 0.8 : 0.45; const nx = P.pos[0] + dx * spd * dt, nz = P.pos[2] + dz * spd * dt;
       if (!WORLD.blocked(nx, P.pos[2], P.pos[1], r)) { P.pos[0] = nx; moved += Math.abs(dx); }
       if (!WORLD.blocked(P.pos[0], nz, P.pos[1], r)) { P.pos[2] = nz; moved += Math.abs(dz); }
-    }
+      // 防卡住：一直推搖桿卻走不動超過 1.2 秒，或人物卡在障礙物裡 → 自動移到旁邊最近的空地
+      if (moved < 0.01) P.stuckT = (P.stuckT || 0) + dt; else P.stuckT = 0;
+    } else P.stuckT = 0;
+    if (P.stuckT > 1.2 || (P.vy === 0 && WORLD.blocked(P.pos[0], P.pos[2], P.pos[1], 0.3))) { G.unstick(P); P.stuckT = 0; }
     // 重力與地面
     const gh = WORLD.surfaceAt(P.pos[0], P.pos[2], P.pos[1]);
     if (P.vy > 0 || P.pos[1] > gh + 0.3) { P.vy -= 26 * dt; P.pos[1] += P.vy * dt; if (P.pos[1] <= gh) { P.pos[1] = gh; P.vy = 0; } }
@@ -419,10 +456,22 @@
       const c = G.cam; const d = c.dist * (P.mounted ? 1.15 : 1);
       pos = [target[0] + Math.sin(c.yaw) * Math.cos(c.pitch) * d, target[1] + Math.sin(c.pitch) * d, target[2] + Math.cos(c.yaw) * Math.cos(c.pitch) * d];
       const gy = WORLD.ground(pos[0], pos[2]) + 0.8; if (pos[1] < gy) pos[1] = gy;
+      // 鏡頭碰撞：牆壁、房屋擋在人物和鏡頭之間時，鏡頭自動拉近
+      // 先試著把鏡頭抬高越過屋頂；還是擋住才把鏡頭拉近
+      const firstHit = (pp) => { const dx = pp[0] - target[0], dy = pp[1] - target[1], dz = pp[2] - target[2]; const L = Math.hypot(dx, dy, dz); for (let t = 0.8; t <= L; t += 0.25) { if (WORLD.camHit(target[0] + dx * t / L, target[1] + dy * t / L, target[2] + dz * t / L)) return t; } return -1; };
+      const at = (pt) => [target[0] + Math.sin(c.yaw) * Math.cos(pt) * d, target[1] + Math.sin(pt) * d, target[2] + Math.cos(c.yaw) * Math.cos(pt) * d];
+      G._camPull = false;
+      if (firstHit(pos) >= 0) {
+        let ok = null; for (let pt = c.pitch + 0.12; pt <= 1.42; pt += 0.12) { const q = at(pt); if (firstHit(q) < 0) { ok = q; break; } }
+        if (ok) pos = ok;
+        else { const h = firstHit(pos); const L = Math.hypot(pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]); const k = Math.max(2.4, h - 0.45) / L; pos = [target[0] + (pos[0] - target[0]) * k, target[1] + (pos[1] - target[1]) * k, target[2] + (pos[2] - target[2]) * k]; }
+        G._camPull = true;
+      }
     }
     if (!pos) return;
     const sm = G.camOverride && G.camOverride.cut ? 1 : Math.min(1, dt * (G.camOverride ? (G.camOverride.speed || 2.5) : 10));
     if (!G._camInit || G.state === 'title' || G.state === 'creator') { R.cam.pos = pos.slice(); R.cam.target = target.slice(); G._camInit = true; if (G.camOverride) G.camOverride.cut = false; return; }
+    if (G._camPull && !G.camOverride && G.state !== 'title' && G.state !== 'creator') { const cd = Math.hypot(R.cam.pos[0] - target[0], R.cam.pos[1] - target[1], R.cam.pos[2] - target[2]), nd = Math.hypot(pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]); if (nd < cd) { R.cam.pos = pos.slice(); R.cam.target = V.lerp(R.cam.target, target, sm); R.cam.far = 900; return; } }
     R.cam.pos = V.lerp(R.cam.pos, pos, sm); R.cam.target = V.lerp(R.cam.target, target, sm);
     if (G.camOverride && G.camOverride.cut) G.camOverride.cut = false;
     R.cam.far = 900;

@@ -90,6 +90,14 @@
     }
     return h;
   };
+  // 鏡頭碰撞用：點是否在建築物、城牆裡（含一點邊界）
+  W.camHit = function (x, y, z) {
+    const m = 0.3;
+    for (const s of W.solids) {
+      if (x > s.x0 - m && x < s.x1 + m && z > s.z0 - m && z < s.z1 + m) { const t = surfTop(s, Math.max(s.x0, Math.min(s.x1, x)), Math.max(s.z0, Math.min(s.z1, z))); if (y < t + 0.5 && y > s.bottom) return true; }
+    }
+    return false;
+  };
   // 是否被擋住（半徑 r）
   W.blocked = function (x, z, y, r) {
     for (const s of W.solids) {
@@ -321,6 +329,36 @@
     solid(rampX0, rampX1, rz0, rz1, WH, -5, rampTop);
     W.solids[W.solids.length - 1].ramp = true;
     W.rampBottom = [rampX0 + 1.6, 0, rz1 + 1.5];
+    // 城樓平台（坡道頂端加大的平台）＋欄杆：避免從坡道、城牆邊掉下去
+    const lz0 = 4.6, lz1 = rz0;
+    big.box(rampX1 - rampX0, WH, lz1 - lz0, brick, { p: [(rampX0 + rampX1) / 2, WH / 2, (lz0 + lz1) / 2] });
+    big.box(rampX1 - rampX0, 0.12, lz1 - lz0, '#cdbfa6', { p: [(rampX0 + rampX1) / 2, WH + 0.06, (lz0 + lz1) / 2] });
+    solid(rampX0, rampX1, lz0, lz1, WH);
+    const RAIL = '#a8322a', RAILT = '#f2c14e';
+    const railZ = (x, za, zb, yAt) => { // 沿 z 方向的欄杆（yAt：地面高度）
+      const n = Math.max(2, Math.round((zb - za) / 1.4));
+      for (let i = 0; i <= n; i++) { const z = za + (zb - za) * i / n; const y = yAt(z); big.box(0.22, 1.1, 0.22, RAIL, { p: [x, y + 0.55, z] }); big.box(0.3, 0.12, 0.3, RAILT, { p: [x, y + 1.14, z] }); }
+      for (let i = 0; i < n; i++) { const z0 = za + (zb - za) * i / n, z1 = za + (zb - za) * (i + 1) / n; const y0 = yAt(z0), y1 = yAt(z1); const len = Math.hypot(z1 - z0, y1 - y0), ang = Math.atan2(y1 - y0, z1 - z0);
+        for (const hh of [0.5, 1.0]) big.box(0.12, 0.12, len, RAIL, { p: [x, (y0 + y1) / 2 + hh, (z0 + z1) / 2], r: [-ang, 0, 0] }); }
+    };
+    const railX = (z, xa, xb, y) => { const n = Math.max(2, Math.round((xb - xa) / 1.4)); for (let i = 0; i <= n; i++) { const x = xa + (xb - xa) * i / n; big.box(0.22, 1.1, 0.22, RAIL, { p: [x, y + 0.55, z] }); big.box(0.3, 0.12, 0.3, RAILT, { p: [x, y + 1.14, z] }); } for (const hh of [0.5, 1.0]) big.box(xb - xa, 0.12, 0.12, RAIL, { p: [(xa + xb) / 2, y + hh, z] }); };
+    // 坡道＋平台外側
+    railZ(rampX1 - 0.12, lz0, rz1, (z) => z <= rz0 ? WH : rampTop(0, z));
+    solid(rampX1 - 0.3, rampX1 + 0.15, lz0, rz1, WH + 1.1, -5, (x, z) => (z <= rz0 ? WH : rampTop(0, z)) + 1.1);
+    W.solids[W.solids.length - 1].walk = false;
+    // 平台北側（靠城樓）
+    railX(lz0 + 0.12, -HALF + 2.4, rampX1, WH); solid(-HALF + 2.4, rampX1 + 0.15, lz0 - 0.15, lz0 + 0.3, WH + 1.1, WH - 0.3); W.solids[W.solids.length - 1].walk = false;
+    // 城牆內側欄杆（四面，西牆避開平台與坡道）
+    const ie = HALF - TH / 2; // 內側邊線 28.5
+    const segs = [['z', -ie, -HALF + 2.5, lz0], ['z', -ie, rz1, HALF - 2.5], ['z', ie, -HALF + 2.5, HALF - 2.5], ['x', -ie, -HALF + 2.5, HALF - 2.5], ['x', ie, -HALF + 2.5, HALF - 2.5]];
+    for (const [ax, c, a, b2] of segs) {
+      const off = c < 0 ? 0.12 : -0.12;
+      if (ax === 'z') { railZ(c + off * -1 + (c < 0 ? -0.24 : 0.24), a, b2, () => WH); const xx = c < 0 ? c - 0.35 : c + 0.35; solid(Math.min(c, xx), Math.max(c, xx), a, b2, WH + 1.1, WH - 0.3); }
+      else { railX(c + (c < 0 ? -0.24 : 0.24), a, b2, WH); const zz = c < 0 ? c - 0.35 : c + 0.35; solid(a, b2, Math.min(c, zz), Math.max(c, zz), WH + 1.1, WH - 0.3); }
+      W.solids[W.solids.length - 1].walk = false;
+    }
+    // 西牆 z 11~23 段的內側（緊鄰坡道）也加欄杆，避免從城牆跳到坡道外
+    railZ(-ie - 0.24, rz0, rz1, () => WH); solid(-ie - 0.35, -ie, rz0, rz1, WH + 1.1, WH - 0.3); W.solids[W.solids.length - 1].walk = false;
 
     /* ===== 城內 ===== */
     const city = new Builder();

@@ -493,6 +493,7 @@
     shutong2: { name: '書僮', gender: 'm', hair: 'twin', hairCol: '#1d1a22', hat: 'none', outfit: 'cloth', clothCol: '#b8a8e0', accent: '#ffffff', acc: 'scroll', weapon: 'none' },
     messenger: { name: '傳令兵', gender: 'm', hair: 'bun', hat: 'band', outfit: 'cloth', clothCol: '#e0a040', accent: '#c0392b', acc: 'backflag', weapon: 'none' },
     shuSoldier: { name: '蜀軍隊長', gender: 'm', hair: 'short', hat: 'helmet', plume: '#d6352b', outfit: 'armor', clothCol: '#c9d2dc', accent: '#c0392b', acc: 'none', weapon: 'spear' },
+    scout: { name: '巡邏小兵', gender: 'm', hair: 'short', hat: 'band', outfit: 'battle', clothCol: '#7fb28a', accent: '#c0392b', acc: 'backflag', weapon: 'spear' },
     weiSoldier: { name: '魏兵', gender: 'm', hair: 'short', hat: 'helmet', hatCol: '#b0a8c8', plume: '#8a4fc8', outfit: 'armor', clothCol: '#8a84a8', accent: '#4a3a7a', acc: 'none', weapon: 'spear' },
     teacher: { name: '書院夫子', gender: 'm', hair: 'bun', hairCol: '#cfcbd6', beard: 'long', hat: 'guan', outfit: 'taoist', clothCol: '#ffffff', accent: '#2b2b33', acc: 'scroll', weapon: 'none' },
     villager: { name: '百姓', gender: 'm', hair: 'bun', hat: 'douli', outfit: 'cloth', clothCol: '#b0906a', accent: '#6a4a2a', acc: 'none', weapon: 'broom' },

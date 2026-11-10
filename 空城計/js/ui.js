@@ -69,8 +69,8 @@
 
   /* ================= 基本元件 ================= */
   UI.toast = function (msg, ms) { const t = $('#toast'); t.innerHTML = msg; t.classList.add('show'); clearTimeout(UI._tt); UI._tt = setTimeout(() => t.classList.remove('show'), ms || 2600); };
-  UI.openModal = function (cls) { const m = $('#modal'); const box = $('#modalBox'); box.className = 'modal-box ' + (cls || ''); box.innerHTML = ''; m.classList.remove('hidden'); box.scrollTop = 0; return box; };
-  UI.closeModal = function () { $('#modal').classList.add('hidden'); $('#modalBox').innerHTML = ''; };
+  UI.openModal = function (cls) { document.body.classList.add('modal-open'); const m = $('#modal'); const box = $('#modalBox'); box.className = 'modal-box ' + (cls || ''); box.innerHTML = ''; m.classList.remove('hidden'); box.scrollTop = 0; return box; };
+  UI.closeModal = function () { document.body.classList.remove('modal-open'); $('#modal').classList.add('hidden'); $('#modalBox').innerHTML = ''; };
   UI.fade = async function (fn) { const f = $('#fade'); f.classList.add('on'); await sleep(380); if (fn) await fn(); await sleep(120); f.classList.remove('on'); };
   function screen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); if (id) $(id).classList.remove('hidden'); }
   UI.screen = screen;
@@ -309,13 +309,30 @@
 
   /* ================= 關卡流程 ================= */
   const ABORT = { abort: true };
+  const MG_HOW = {
+    assign: '玩法：先點一張任務卡，再點它該去的地方。',
+    simon: '玩法：按下「開始」後，烽火會一座一座亮起，記住順序再照著點。',
+    rhythm: '玩法：音符落到下面的線時，點那一條琴弦（電腦可按 A S D F G）。',
+    match: '玩法：先點左邊的一項，再點右邊和它配對的答案。',
+    order: '玩法：依照事情發生的先後，一張一張點選排好。',
+    memory: '玩法：翻開兩張牌，找出成對的牌。'
+  };
+  UI.scoutTip = function (sc) {
+    const t = $('#scoutTip'); if (!t) return;
+    let img = ''; try { if (!UI._scoutImg) UI._scoutImg = G.portrait(MD.NPC.scout, 'head', 120); img = UI._scoutImg; } catch (e) { }
+    t.innerHTML = `${img ? `<img src="${img}" alt="">` : '<span class="st-ico">🪖</span>'}<div><div class="st-name">${esc(sc.name || '巡邏小兵')}<small>情報 ${sc.idx + 1}／${G.scouts.length}</small></div><div class="st-text">${esc(sc.text)}</div></div><button class="st-x" aria-label="關閉">✕</button>`;
+    t.classList.remove('hidden'); void t.offsetWidth; t.classList.add('show'); sfx('page');
+    clearTimeout(UI._stt); UI._stt = setTimeout(() => UI.hideScoutTip(), 9000);
+    t.onclick = () => UI.hideScoutTip();
+  };
+  UI.hideScoutTip = function () { const t = $('#scoutTip'); if (!t) return; t.classList.remove('show'); clearTimeout(UI._stt); setTimeout(() => { if (!t.classList.contains('show')) t.classList.add('hidden'); }, 300); };
   UI.exitLevel = function () { if (UI._abortFn) UI._abortFn(); };
   UI.startLevel = async function (id) {
     const lv = D.levels.find(l => l.id === id); const st = G.stations.find(s => s.id === id);
     let abortRej; const abortP = new Promise((_, rej) => { abortRej = rej; }); abortP.catch(() => { });
     UI._abortFn = () => abortRej(ABORT);
     const guard = (p) => Promise.race([p, abortP]);
-    $('#exitLevel').classList.remove('hidden');
+    $('#exitLevel').classList.remove('hidden'); document.body.classList.add('in-level'); UI.hideScoutTip();
     try {
       G.state = 'modal'; $('#btnAct').classList.add('hidden'); $('#controls').classList.add('hidden'); $('#joy').classList.add('hidden');
       // 鏡頭轉向 NPC
@@ -330,16 +347,17 @@
       if (m.type === 'collect') {
         await guard(infoCard(`🎮 小遊戲：${m.name}`, `${m.tip}<br>⏱ 限時 ${m.time} 秒，共 ${m.count} 個！`, '開始！'));
         G.camOverride = null; setHUD(true); $('#btnAct').classList.add('hidden');
-        const r = await guard(G.startCollect(m)); mini = r.score;
+        document.body.classList.add('collecting'); const r = await guard(G.startCollect(m).finally(() => document.body.classList.remove('collecting'))); mini = r.score;
         $('#controls').classList.add('hidden'); $('#joy').classList.add('hidden');
         await guard(infoCard(r.got >= r.total ? '🎉 全部收集完成！' : '⏱ 時間到！', `收集了 ${r.got} / ${r.total} 個，小遊戲得分 <b>${mini}</b> 分`, '進入問答 ➜'));
       } else {
+        await guard(infoCard(`🎮 小遊戲：${m.name}`, `${m.tip || ''}${MG_HOW[m.type] ? '<br><small>' + MG_HOW[m.type] + '</small>' : ''}`, '開始！'));
         const box = UI.openModal('mg-modal'); if (m.type === 'rhythm' || m.type === 'simon') AUDIO.duck(true);
         mini = await guard(MINIGAMES[m.type](box, m)); AUDIO.duck(false);
         sfx('fanfare'); await guard(infoCard('🎉 小遊戲完成！', `小遊戲得分 <b>${mini}</b> / ${D.scoring.miniMax} 分`, '進入問答 ➜'));
       }
       const quiz = await guard(UI.runQuiz(lv));
-      $('#exitLevel').classList.add('hidden'); UI._abortFn = null;
+      $('#exitLevel').classList.add('hidden'); document.body.classList.remove('in-level'); UI._abortFn = null;
       await UI.showResult(lv, mini, quiz);
       G.camOverride = null; UI.closeModal();
       if (D.levels.every(l => G.isDone(l.id)) && !G.save.finaleDone) { UI.runFinale(); return; }
@@ -349,11 +367,11 @@
       // 中途離開：清除畫面上的關卡內容，回到地圖
       UI.closeModal(); $('#dialog').classList.add('hidden'); UI.dialogNext = () => { };
       $('#banner').classList.add('hidden'); $('#banner').classList.remove('show');
-      if (G.collect) { for (const it of G.collect.items) if (!it.taken) G.world.remove(it.node); G.collect = null; UI.collectHUD(false); }
+      document.body.classList.remove('collecting'); if (G.collect) { for (const it of G.collect.items) if (!it.taken) G.world.remove(it.node); G.collect = null; UI.collectHUD(false); }
       AUDIO.duck(false); G.camOverride = null; G.state = 'world'; setHUD(true); G.near = null; G.stopAuto && G.stopAuto();
       UI.toast(`已離開 第${id}關，隨時可以回來挑戰！`);
     } finally {
-      $('#exitLevel').classList.add('hidden'); UI._abortFn = null;
+      $('#exitLevel').classList.add('hidden'); document.body.classList.remove('in-level'); UI._abortFn = null;
     }
   };
   function showLevelIntro(lv) {

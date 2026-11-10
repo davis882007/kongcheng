@@ -375,7 +375,7 @@
         box.appendChild(el('div', 'q-head', `<span class="phase ph-${lv.phase}">第${lv.id}關</span> 智謀問答 ${i + 1} / ${lv.quiz.length}<span class="q-score">⭐ ${score}</span>`));
         box.appendChild(el('div', 'q-text', esc(q.q)));
         const opts = el('div', 'q-opts'); box.appendChild(opts); const fb = el('div', 'q-fb'); box.appendChild(fb);
-        const order = q.options.map((t, k) => ({ t, k }));
+        const order = q.options.map((t, k) => ({ t, k })); for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
         order.forEach(({ t, k }, n) => {
           const b = el('button', 'q-opt', `<b>${'ABCD'[n]}</b>${esc(t)}`);
           b.onclick = () => {

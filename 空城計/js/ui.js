@@ -14,9 +14,11 @@
 
   /* ================= 排行榜 ================= */
   const LB_KEY = 'kongcheng_board_v1';
-  const KEEP = (CFG.keepDays || 7) * 864e5, TOP = CFG.leaderboardTop || 30;
+  const KEEP = (CFG.keepDays || 14) * 864e5, TOP = CFG.leaderboardTop || 30;
+  // 同一名稱只留最高分（同分留較早的）
+  const bestByName = (rows) => { const m = {}; for (const r of rows) { const k = String(r.name || '').trim(); const b = m[k]; if (!b || r.score > b.score || (r.score === b.score && r.time < b.time)) m[k] = r; } return Object.values(m); };
   const LB = UI.LB = {
-    local() { let a = []; try { a = JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch (e) { } const now = Date.now(); a = a.filter(r => now - r.time < KEEP); try { localStorage.setItem(LB_KEY, JSON.stringify(a)); } catch (e) { } return a.sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP); },
+    local() { let a = []; try { a = JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch (e) { } const now = Date.now(); a = bestByName(a.filter(r => now - r.time < KEEP)); try { localStorage.setItem(LB_KEY, JSON.stringify(a)); } catch (e) { } return a.sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP); },
     addLocal(r) { let a = []; try { a = JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch (e) { } a.push(r); try { localStorage.setItem(LB_KEY, JSON.stringify(a)); } catch (e) { } },
     jsonp(params) {
       return new Promise((resolve, reject) => {
@@ -51,10 +53,10 @@
         const now = Date.now(); const rows = []; const old = [];
         for (const d of snap.docs) { const r = d.data(); if (!r) continue; if (now - (+r.time || 0) > KEEP) old.push(d.id); else rows.push({ name: String(r.name || ''), score: +r.score || 0, title: String(r.title || ''), time: +r.time || 0 }); }
         if (old.length && LB.canWrite !== false) old.slice(0, 20).forEach(id => LB.db.collection('scores').doc(id).delete().catch(() => { }));
-        return rows.sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP);
+        return bestByName(rows).sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP);
       }
-      const d = await LB.jsonp({ action: 'list', top: TOP, days: CFG.keepDays || 7 });
-      return (d.rows || []).map(r => ({ name: r.name, score: +r.score, title: r.title, time: +r.time || Date.parse(r.time) }));
+      const d = await LB.jsonp({ action: 'list', top: TOP, days: CFG.keepDays || 14 });
+      return bestByName((d.rows || []).map(r => ({ name: r.name, score: +r.score, title: r.title, time: +r.time || Date.parse(r.time) }))).sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP);
     },
     async submit(r) {
       LB.addLocal(r); await LB.initCloud();
@@ -315,7 +317,7 @@
     rhythm: '玩法：音符落到下面的線時，點那一條琴弦（電腦可按 A S D F G）。',
     match: '玩法：先點左邊的一項，再點右邊和它配對的答案。',
     order: '玩法：依照事情發生的先後，一張一張點選排好。',
-    memory: '玩法：翻開兩張牌，找出成對的牌。'
+    memory: '玩法：一開始所有牌會翻開 3 秒，記住位置後牌會蓋起來，再翻開兩張找出成對的牌。'
   };
   UI.scoutTip = function (sc) {
     const t = $('#scoutTip'); if (!t) return;
@@ -543,7 +545,7 @@
     box.appendChild(row);
     const where = await LB.submit({ name: G.save.name, score: total, title, time: Date.now() });
     G.save.submitted = true; G.writeSave();
-    const m = $('#submitMsg'); if (m) m.innerHTML = where === 'online' ? '✅ 已登錄到<b>網路排行榜</b>，大家都看得到！' : where === 'readonly' ? '✅ 已記錄在<b>本機排行榜</b>（這個帳號只能觀看網路排行榜）' : '✅ 已登錄到<b>本機排行榜</b>（紀錄保留 7 天）';
+    const m = $('#submitMsg'); if (m) m.innerHTML = where === 'online' ? '✅ 已登錄到<b>網路排行榜</b>，大家都看得到！' : where === 'readonly' ? '✅ 已記錄在<b>本機排行榜</b>（這個帳號只能觀看網路排行榜）' : `✅ 已登錄到<b>本機排行榜</b>（紀錄保留 ${CFG.keepDays || 14} 天）`;
   };
 
   /* ================= 排行榜畫面 ================= */
@@ -552,7 +554,7 @@
     const box = UI.openModal('board-modal');
     await LB.initCloud(); let mode = LB.hasOnline() ? 'online' : 'local';
     const draw = async () => {
-      box.innerHTML = `<h2>🏆 空城計英雄榜</h2><p class="lead">前 ${TOP} 名・紀錄保留 ${CFG.keepDays || 7} 天後自動刪除，讓新英雄上榜！</p>`;
+      box.innerHTML = `<h2>🏆 空城計英雄榜</h2><p class="lead">前 ${TOP} 名・同一名稱只列最高分・紀錄保留 ${CFG.keepDays || 14} 天後自動刪除，讓新英雄上榜！</p>`;
       const tabs = el('div', 'tabs2'); [['online', '🌐 網路排行榜'], ['local', '💻 本機排行榜']].forEach(([k, n]) => { const b = el('button', 'tab' + (mode === k ? ' on' : ''), n); b.onclick = () => { mode = k; draw(); }; tabs.appendChild(b); }); box.appendChild(tabs);
       const tb = el('div', 'board', '<p class="lead">讀取中……</p>'); box.appendChild(tb);
       const x = el('button', 'close', '✕'); x.onclick = () => { UI.closeModal(); if (prev !== 'title') UI.backToWorld(); }; box.appendChild(x);

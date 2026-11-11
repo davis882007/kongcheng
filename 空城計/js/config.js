@@ -7,7 +7,7 @@
 window.GAME_CONFIG = {
   leaderboardUrl: 'https://script.google.com/macros/s/AKfycbzkYSnz1UTgGrBbxshmGvZHt_jCp1Ub5UJi58hP8swA7v5cqUQ4-lcdIhBnkrKCu_Fkwg/exec',
   leaderboardTop: 30,       // 顯示前幾名
-  keepDays: 7,              // 紀錄保留天數（超過自動刪除）
+  keepDays: 14,             // 紀錄保留天數（超過自動刪除）；同一名稱只保留最高分
   certificateTitle: '空城計 智謀大師 成就證書',
   schoolName: ''            // 可填學校／班級名稱，會印在證書上
 };

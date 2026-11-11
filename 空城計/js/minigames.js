@@ -193,6 +193,10 @@
         };
         grid.appendChild(e);
       });
+      // 開始前先把所有牌翻開給大家記 3 秒，再蓋起來
+      const all = [...grid.querySelectorAll('.mcard')]; lock = true; all.forEach(x => x.classList.add('flip'));
+      let left = 3; const tick = () => { stat.textContent = `👀 先記住牌的位置…… ${left} 秒`; };
+      tick(); const iv = setInterval(() => { left--; if (left > 0) { tick(); return; } clearInterval(iv); all.forEach(x => x.classList.remove('flip')); sfx('page'); lock = false; upd(); }, 1000);
     });
   };
 

@@ -14,11 +14,11 @@
 
   /* ================= 排行榜 ================= */
   const LB_KEY = 'kongcheng_board_v1';
-  const KEEP = (CFG.keepDays || 14) * 864e5, TOP = CFG.leaderboardTop || 30;
+  const KEEP = (CFG.keepDays || 14) * 864e5, TOP = CFG.leaderboardTop || 50;
   // 同一名稱只留最高分（同分留較早的）
-  const bestByName = (rows) => { const m = {}; for (const r of rows) { const k = String(r.name || '').trim(); const b = m[k]; if (!b || r.score > b.score || (r.score === b.score && r.time < b.time)) m[k] = r; } return Object.values(m); };
+  const bestByName = (rows) => { const m = {}; for (const r of rows) { const k = String(r.name || '').trim(); const b = m[k]; if (!b || r.score > b.score || (r.score === b.score && r.time > b.time)) m[k] = r; } return Object.values(m); };
   const LB = UI.LB = {
-    local() { let a = []; try { a = JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch (e) { } const now = Date.now(); a = bestByName(a.filter(r => now - r.time < KEEP)); try { localStorage.setItem(LB_KEY, JSON.stringify(a)); } catch (e) { } return a.sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP); },
+    local() { let a = []; try { a = JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch (e) { } const now = Date.now(); a = bestByName(a.filter(r => now - r.time < KEEP)); try { localStorage.setItem(LB_KEY, JSON.stringify(a)); } catch (e) { } return a.sort((x, y) => y.score - x.score || y.time - x.time).slice(0, TOP); },
     addLocal(r) { let a = []; try { a = JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch (e) { } a.push(r); try { localStorage.setItem(LB_KEY, JSON.stringify(a)); } catch (e) { } },
     jsonp(params) {
       return new Promise((resolve, reject) => {
@@ -53,10 +53,10 @@
         const now = Date.now(); const rows = []; const old = [];
         for (const d of snap.docs) { const r = d.data(); if (!r) continue; if (now - (+r.time || 0) > KEEP) old.push(d.id); else rows.push({ name: String(r.name || ''), score: +r.score || 0, title: String(r.title || ''), time: +r.time || 0 }); }
         if (old.length && LB.canWrite !== false) old.slice(0, 20).forEach(id => LB.db.collection('scores').doc(id).delete().catch(() => { }));
-        return bestByName(rows).sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP);
+        return bestByName(rows).sort((x, y) => y.score - x.score || y.time - x.time).slice(0, TOP);
       }
       const d = await LB.jsonp({ action: 'list', top: TOP, days: CFG.keepDays || 14 });
-      return bestByName((d.rows || []).map(r => ({ name: r.name, score: +r.score, title: r.title, time: +r.time || Date.parse(r.time) }))).sort((x, y) => y.score - x.score || x.time - y.time).slice(0, TOP);
+      return bestByName((d.rows || []).map(r => ({ name: r.name, score: +r.score, title: r.title, time: +r.time || Date.parse(r.time) }))).sort((x, y) => y.score - x.score || y.time - x.time).slice(0, TOP);
     },
     async submit(r) {
       LB.addLocal(r); await LB.initCloud();
